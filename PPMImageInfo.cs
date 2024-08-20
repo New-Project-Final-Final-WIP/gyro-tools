@@ -53,7 +53,7 @@ public struct PPMImageInfo(int width, int height, int bitDepth)
         // If not P6, then just die
         if (sb.ToString() != "P6")
         {
-            Console.WriteLine("This ain't a ppm file DUMMY");
+            Program.ProgramLog.LogWarn("This ain't a ppm file DUMMY");
             info = default;
             return false;
         }

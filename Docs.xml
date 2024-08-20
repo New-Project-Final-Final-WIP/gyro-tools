@@ -1,0 +1,231 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>PCDToPNG</name>
+    </assembly>
+    <members>
+        <member name="T:PCDToPNG.FileHelper">
+            <summary>
+            Class to handle the optimization step/action in the image manipulation pipeline
+            </summary>
+        </member>
+        <member name="M:PCDToPNG.FileHelper.FindFilesByExtension(System.String,System.String[])">
+            <summary>
+            Finds all files of a single specified type by extension
+            </summary>
+            <param name="inputPath">The path to search for files (recursively)</param>
+            <param name="extensions">The extension(s) to search for</param>
+            <returns></returns>
+        </member>
+        <member name="T:PCDToPNG.OptimizationHelper">
+            <summary>
+            Class to handle the optimization step/action in the image manipulation pipeline
+            </summary>
+        </member>
+        <member name="F:PCDToPNG.OptimizationHelper.ValidExtensions">
+            <summary>
+            List of valid extensions for optimization
+            </summary>
+        </member>
+        <member name="M:PCDToPNG.OptimizationHelper.OptimizeDirectory(System.String,System.Int32)">
+            <summary>
+            
+            </summary>
+            <param name="inputPath"> Input path to optimize</param>
+            <param name="parallelism"> Degree of paralellism by which to optimize</param>
+            <returns></returns>
+        </member>
+        <member name="M:PCDToPNG.OptimizationHelper.OptimizeImage(System.Int32,System.IO.FileInfo[])">
+            <summary>
+            Handles running and tracking Image Optimization with Magick.NET
+            Ain't a perfect library but we gotta save where we can
+            </summary>
+            <param name="parallelism"> Number of cores to dedicate to this task</param>
+            <param name="imageFiles"> Array of FileInfo objects that contain references to all files we plan to optimize</param>
+            <returns></returns>
+        </member>
+        <member name="M:PCDToPNG.OptimizationHelper.BytesToMegabytes(System.Int64)">
+            <summary>
+            Converts bytes into megabytes
+            </summary>
+            <param name="bytes">Number of byte</param>
+            <returns></returns>
+        </member>
+        <member name="T:PCDToPNG.PCDHelper">
+            <summary>
+            
+            </summary>
+        </member>
+        <member name="M:PCDToPNG.PCDHelper.ProcessPCDToPPM(System.Int32,System.IO.FileInfo[])">
+            <summary>
+            Handles multithreading conversions from PCD to PPM
+            </summary>
+            <param name="parallelism">How many cores to use for the process</param>
+            <param name="pcdFiles">One to Many FileInfo objects that reference ppm files</param>
+            <returns></returns>
+        </member>
+        <member name="M:PCDToPNG.PCDHelper.ProcessPPM(System.String,System.Int32,System.Boolean,System.IO.FileInfo[])">
+            <summary>
+            Handles reading in all PPM files and passing them to the PPMToImageSharp function for conversion
+            </summary>
+            <param name="outputPath">Output path for converted pcd files</param>
+            <param name="parallelism">How many cores to use for the process</param>
+            <param name="bmp">Boolean to control if outputted files are .bmp vs png</param>
+            <param name="ppmFiles">One to Many FileInfo objects that reference ppm files</param>
+            <returns></returns>
+        </member>
+        <member name="M:PCDToPNG.PCDHelper.PPMToImageSharp(System.IO.Stream)">
+            <summary>
+            Processes a ppm file from a stream
+            </summary>
+            <param name="ppm">The stream to read the ppm file from</param>
+            <returns>An image, or null if the PPM failed to parse</returns>
+        </member>
+        <member name="T:PCDToPNG.PPMImageInfo">
+            <summary>
+            Image info for a given PPM file
+            </summary>
+        </member>
+        <member name="M:PCDToPNG.PPMImageInfo.#ctor(System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Image info for a given PPM file
+            </summary>
+        </member>
+        <member name="F:PCDToPNG.PPMImageInfo.Width">
+            <summary>
+            Width of the PPM image
+            </summary>
+        </member>
+        <member name="F:PCDToPNG.PPMImageInfo.Height">
+            <summary>
+            Height of the PPM image
+            </summary>
+        </member>
+        <member name="F:PCDToPNG.PPMImageInfo.BitDepth">
+            <summary>
+            Maximum bit-depth of the PPM image
+            </summary>
+        </member>
+        <member name="M:PCDToPNG.PPMImageInfo.TryParse(System.IO.Stream,PCDToPNG.PPMImageInfo@)">
+            <summary>
+            Tries to parse a PPM image's metadata
+            </summary>
+            <param name="stream">The stream to parse from</param>
+            <param name="info">The resulting info, or default if parsing fails</param>
+            <returns>Whether parsing succeeded</returns>
+        </member>
+        <member name="T:PCDToPNG.Program">
+            <summary>
+            Main program
+            </summary>
+        </member>
+        <member name="F:PCDToPNG.Program.WorkOutput">
+            <summary>
+            
+            </summary>
+        </member>
+        <member name="F:PCDToPNG.Program.MissingLogPath">
+            <summary>
+            
+            </summary>
+        </member>
+        <member name="F:PCDToPNG.Program.HpcdToPpmPath">
+            <summary>
+            
+            </summary>
+        </member>
+        <member name="F:PCDToPNG.Program.ProgramLog">
+            <summary>
+            
+            </summary>
+        </member>
+        <member name="M:PCDToPNG.Program.Main(System.String[])">
+            <summary>
+            Main entrypoint
+            </summary>
+            <param name="args">Command-line args</param>
+            <returns>Integer</returns>
+        </member>
+        <member name="M:PCDToPNG.Program.Execute(System.String,System.String,System.Boolean,System.Boolean,System.Boolean,System.Int32,System.Int32)">
+            <summary>
+            Executes the main functionality based on command line flags
+            </summary>
+            <param name="inputPath">The input path to operate on</param>
+            <param name="outputPath">The output path to write to</param>
+            <param name="folder">Whether the paths are to be parsed as folders or files</param>
+            <param name="bmp">When true, outputs files as bmp instead of png</param>
+            <param name="noOptimize">When true, does not run Magick.Net Image Optimization on png export</param>
+            <param name="parallelism">When set higher than 0, specifies the number of cores to use for batch processing</param>
+            <param name="mode">Controls program operating mode, replace with something better later</param>
+        </member>
+        <member name="M:PCDToPNG.Program.ProcessPCDsToPNGs(System.String,System.String,System.Boolean,System.Int32)">
+            <summary>
+            Processes a folder of PPM files into PNG images
+            </summary>
+            <param name="inputPath">The input folder path</param>
+            <param name="outputPath">The output folder path</param>
+            <param name="bmp">Whether to save the output as bmp</param>
+            <param name="parallelism">When set higher than 0, specifies the number of cores to use for batch processing</param>
+        </member>
+        <member name="M:PCDToPNG.Program.ConsumeLog(System.IO.TextReader)">
+            <summary>
+            Consumes logs from a text reader
+            </summary>
+            <param name="reader">Reader to consume from</param>
+            <returns>Task that can be awaited</returns>
+        </member>
+        <member name="M:PCDToPNG.Program.ConsumeError(System.IO.TextReader)">
+            <summary>
+            Consumes logs from a text reader
+            </summary>
+            <param name="reader">Reader to consume from</param>
+            <returns>Task that can be awaited</returns>
+        </member>
+        <member name="M:Logger.LogInfo(System.Object,System.Boolean)">
+            <summary>
+            Logs an informational message
+            </summary>
+            <param name="obj">The object to log</param>
+            <param name="runOnLog">Whether to run auxiliary logging functionality, true by default</param>
+        </member>
+        <member name="M:Logger.LogWarn(System.Object,System.Boolean)">
+            <summary>
+            Logs a warning message
+            </summary>
+            <param name="obj">The object to log</param>
+            <param name="runOnLog">Whether to run auxiliary logging functionality, true by default</param>
+        </member>
+        <member name="M:Logger.LogError(System.Object,System.Boolean)">
+            <summary>
+            Logs an error message
+            </summary>
+            <param name="obj">The object to log</param>
+            <param name="runOnLog">Whether to run auxiliary logging functionality, true by default</param>
+        </member>
+        <member name="T:LogType">
+            <summary>
+            Denotes the type of log
+            </summary>
+        </member>
+        <member name="F:LogType.NONE">
+            <summary>
+            Denotes no log should be written
+            </summary>
+        </member>
+        <member name="F:LogType.INFO">
+            <summary>
+            Denotes an informational log
+            </summary>
+        </member>
+        <member name="F:LogType.WARN">
+            <summary>
+            Denotes a warning log
+            </summary>
+        </member>
+        <member name="F:LogType.ERROR">
+            <summary>
+            Denotes an error log
+            </summary>
+        </member>
+    </members>
+</doc>

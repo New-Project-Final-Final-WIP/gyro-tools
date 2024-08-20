@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.ComponentModel.DataAnnotations;
 using ImageMagick;
 
 
@@ -12,6 +13,10 @@ namespace PCDToPNG;
 public static class OptimizationHelper
 {
     const long BYTE_TO_MEGABYTE = 1048576;
+    /// <summary>
+    /// List of valid extensions for optimization
+    /// </summary>
+    public static readonly string[] ValidExtensions = [".png", ".jpg", ".jpeg", ".gif", ".ico"];
 
     /// <summary>
     /// 
@@ -21,14 +26,9 @@ public static class OptimizationHelper
     /// <returns></returns>
     public static async Task OptimizeDirectory(string inputPath, int parallelism = 0)
     {
-        var validExtensions = new[] {".png", ".jpg", ".jpeg", ".gif", ".ico"};
-        var optimizeableFiles =
-            Directory.EnumerateFiles(inputPath, "*.*", SearchOption.AllDirectories)
-                .Where(p => validExtensions.Any(ext => p.ToLower().EndsWith(ext)))
-                    .Select(f => new FileInfo(f))
-                    .ToArray();
+        var optimizeableFiles = FileHelper.FindFilesByExtension(inputPath, ValidExtensions);
 
-        Console.WriteLine("Optimizing images...");
+        Program.ProgramLog.LogInfo("Optimizing images...");
         (FileInfo[] optimized, long totalSaved) = await OptimizeImage(parallelism, optimizeableFiles);
 
     }
@@ -67,7 +67,7 @@ public static class OptimizationHelper
                     // check if the format is supported
                     if (!opt.IsSupported(file))
                     {
-                        Console.WriteLine($"Extension '{file.Extension}' is not supported");
+                        Program.ProgramLog.LogInfo($"Extension '{file.Extension}' is not supported");
                         return;
                     }
 
@@ -78,8 +78,8 @@ public static class OptimizationHelper
                     float percentDecrease = (float)sizeDifference / preOptimizedSize * 100;
                     float megabyteDifference = BytesToMegabytes(sizeDifference);
                                     
-                    Console.WriteLine($"Optimized '{file}'");
-                    Console.WriteLine($"Saved {megabyteDifference:f2} MB ({percentDecrease:f2}%)");
+                    Program.ProgramLog.LogInfo($"Optimized '{file}'");
+                    Program.ProgramLog.LogInfo($"Saved {megabyteDifference:f2} MB ({percentDecrease:f2}%)");
 
                     Interlocked.Add(ref totalSpaceSaved, sizeDifference);
                 }
@@ -88,7 +88,7 @@ public static class OptimizationHelper
             });
         });
         
-        Console.WriteLine($"Saved {BytesToMegabytes(totalSpaceSaved)} MB");
+        Program.ProgramLog.LogInfo($"Saved {BytesToMegabytes(totalSpaceSaved)} MB");
         return ([.. bag], totalSpaceSaved);
     }
 

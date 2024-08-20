@@ -17,10 +17,10 @@ public static class PCDHelper
     /// <param name="parallelism">How many cores to use for the process</param>
     /// <param name="pcdFiles">One to Many FileInfo objects that reference ppm files</param>
     /// <returns></returns>
-    public static async Task<FileInfo[]> ProcessPCDToPPM(int parallelism = 0, params FileInfo[] pcdFiles)
+    public static async Task<(FileInfo[] processedFiles, FileInfo[] resultingFiles)> ProcessPCDToPPM(int parallelism = 0, params FileInfo[] pcdFiles)
     {
         var parallelQuery = pcdFiles.AsParallel();
-        ConcurrentBag<FileInfo> bag = [];
+        ConcurrentDictionary<FileInfo, FileInfo> bag = [];
         
         
         if (parallelism > 0)
@@ -33,7 +33,7 @@ public static class PCDHelper
             {
                 string inputFileName = Path.GetFileNameWithoutExtension(file.FullName);
                 string outputFile = Path.Combine(Program.WorkOutput, inputFileName + ".ppm");
-                Console.WriteLine($"Converting {file} into {outputFile}");
+                Program.ProgramLog.LogInfo($"Converting {file} into {outputFile}");
                 FileInfo outputInfo = new(outputFile);
 
 
@@ -48,7 +48,7 @@ public static class PCDHelper
 
                 if (proc == null)
                 {
-                    Console.WriteLine("Process was null, WTF!!!!!!!!!!!!!!!");
+                    Program.ProgramLog.LogInfo("Process was null, WTF!!!!!!!!!!!!!!!");
                     return;
                 }
                 
@@ -60,17 +60,15 @@ public static class PCDHelper
                 proc?.WaitForExit();
 
                 if (!File.Exists(outputFile))
-                {
-                    Program.AppendMissing(outputFile);
-                }
+                    Program.ProgramLog.LogWarn($"'{outputFile}' doesn't exist, skipping!");
 
-                bag.Add(outputInfo);
+                bag.TryAdd(file, outputInfo);
 
-                Console.WriteLine($"Converting {outputInfo} into a PPM");
+                Program.ProgramLog.LogInfo($"Converting {outputInfo} into a PPM");
             });
         });
 
-        return [.. bag];
+        return (bag.Keys.ToArray(), bag.Values.ToArray());
     }
 
 
@@ -83,10 +81,10 @@ public static class PCDHelper
     /// <param name="bmp">Boolean to control if outputted files are .bmp vs png</param>
     /// <param name="ppmFiles">One to Many FileInfo objects that reference ppm files</param>
     /// <returns></returns>
-    public static async Task<FileInfo[]> ProcessPPM(string outputPath, int parallelism = 0, bool bmp = false, params FileInfo[] ppmFiles)
+    public static async Task<(FileInfo[] processedFiles, FileInfo[] resultingFiles)> ProcessPPM(string outputPath, int parallelism = 0, bool bmp = false, params FileInfo[] ppmFiles)
     {
         var parallelQuery = ppmFiles.AsParallel();
-        ConcurrentBag<FileInfo> bag = [];
+        ConcurrentDictionary<FileInfo, FileInfo> bag = [];
         
         
         if (parallelism > 0)
@@ -109,7 +107,7 @@ public static class PCDHelper
 
                 if (!file.Exists)
                 {
-                    bag.Add(new(outputFile));
+                    bag.TryAdd(file, new(outputFile));
                     return;
                 }
 
@@ -123,13 +121,13 @@ public static class PCDHelper
                 
                 ppm.Dispose();
 
-                bag.Add(new(outputFile));
+                bag.TryAdd(file, new(outputFile));
 
-                Console.WriteLine($"Processed '{file}' into {(bmp ? "bmp" : "png")} format");
+                Program.ProgramLog.LogInfo($"Processed '{file}' into {(bmp ? "bmp" : "png")} format");
             });
         });
 
-        return [.. bag];
+        return (bag.Keys.ToArray(), bag.Values.ToArray());
     }
 
 

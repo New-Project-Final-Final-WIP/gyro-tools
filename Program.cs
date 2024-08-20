@@ -10,7 +10,7 @@ using ImageMagick.ImageOptimizers;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
-
+using Microsoft.Extensions.Logging;
 
 namespace PCDToPNG;
 
@@ -21,6 +21,7 @@ public class Program
 {
     const string DEFAULT_INPUT = "./input";
     const string DEFAULT_OUTPUT = "./output";
+    const string LOG_PATH = "./Output.log";
     
     /// <summary>
     /// 
@@ -39,12 +40,60 @@ public class Program
     static readonly object lockObj = new();
 
     /// <summary>
+    /// 
+    /// </summary>
+    public static Logger ProgramLog = new();
+
+
+    public static FileStream LogStream;
+    public static StreamWriter LogWriter;
+
+
+    /// <summary>
     /// Main entrypoint
     /// </summary>
     /// <param name="args">Command-line args</param>
     /// <returns>Integer</returns>
     public static async Task<int> Main(string[] args)
     {
+        if (!File.Exists(LOG_PATH))
+            File.Create(LOG_PATH);
+        
+        LogStream = File.OpenWrite(LOG_PATH);
+
+        LogWriter = new(LogStream);
+
+
+
+        ProgramLog.OnLog += (source, args) =>
+        {
+            lock (lockObj)
+            {
+                LogWriter.WriteLine(args.Msg);
+                LogWriter.Flush();
+            }
+        };
+
+        ProgramLog.OnWarn += (source, args) =>
+        {
+            lock (lockObj)
+            {
+                LogWriter.WriteLine(args.Msg);
+                LogWriter.Flush();
+            }
+        };
+
+        ProgramLog.OnError += (source, args) =>
+        {
+            lock (lockObj)
+            {
+                LogWriter.WriteLine(args.Msg);
+                LogWriter.Flush();
+            }
+        };
+
+
+
         RootCommand root = new("Converts one or more PCD files into PNG");
 
 
@@ -118,8 +167,6 @@ public class Program
     /// <param name="mode">Controls program operating mode, replace with something better later</param>
     public static async Task Execute(string inputPath, string outputPath, bool folder, bool bmp = false, bool noOptimize = false, int parallelism = 0, int mode = 0)
     {
-        File.Delete(MissingLogPath);
-
         // Create dirs if they don't exist
         if (!Directory.Exists(DEFAULT_OUTPUT))
             Directory.CreateDirectory(DEFAULT_OUTPUT);
@@ -145,23 +192,23 @@ public class Program
                     hpcdPath = Path.Combine(Path.GetDirectoryName(hpcdPath)!, Path.GetFileNameWithoutExtension(hpcdPath));
             
                 if (!File.Exists(hpcdPath))
-                    Console.WriteLine($"Failed to find {hpcdPath}! Did you place it next to this executable?");
+                    ProgramLog.LogInfo($"Failed to find {hpcdPath}! Did you place it next to this executable?");
                 
-                if (folder)
-                    await ProcessPCDsToPNGs(fullInput, fullOutput, bmp, parallelism);
-                else
-                {
-                    await ProcessPCDToPNG(fullInput, fullOutput, bmp, parallelism);
-                }
+                
+            await ProcessPCDsToPNGs(fullInput, fullOutput, bmp, parallelism);
+
             break;
             // Optimize folder
             case 1:
                 if (folder)
                     await OptimizationHelper.OptimizeDirectory(fullInput, parallelism);
                 else
-                    Console.WriteLine("Nope, too lazy");
+                    ProgramLog.LogWarn("Nope, too lazy");
             break;
         }
+
+        LogStream.Dispose();
+        
     }
 
     //// does not handle overriding files
@@ -175,51 +222,32 @@ public class Program
     /// <param name="parallelism">When set higher than 0, specifies the number of cores to use for batch processing</param>
     public static async Task ProcessPCDsToPNGs(string inputPath, string outputPath, bool bmp = false, int parallelism = 0)
     {
-        var pcdFiles =
-            Directory.EnumerateFiles(inputPath, "*.*", SearchOption.AllDirectories)
-                .Where(p => p.ToLower()
-                    .EndsWith(".pcd"))
-                    .Select(f => new FileInfo(f))
-                    .ToArray();
+        var inputAttributes = File.GetAttributes(inputPath);
+        var outputAttributes = File.GetAttributes(outputPath);
+
+        bool inputIsDir = (inputAttributes & FileAttributes.Directory) == FileAttributes.Directory;
+        FileInfo[] pcdFiles;
+        
+        if (inputIsDir)
+        {
+            pcdFiles = FileHelper.FindFilesByExtension(inputPath, ".pcd");
+        }
+        else
+        {
+            pcdFiles = [new FileInfo(inputPath)];
+        }
         
 
-        Console.WriteLine("Processing PCDs into PPMs and storing them temporarily in the work directory...");
-        FileInfo[] ppms = await PCDHelper.ProcessPCDToPPM(parallelism, pcdFiles);
+        ProgramLog.LogInfo("Processing PCDs into PPMs and storing them temporarily in the work directory...");
+        (FileInfo[] processedPCD, FileInfo[] resultingPPMs) = await PCDHelper.ProcessPCDToPPM(parallelism, pcdFiles);
 
-        Console.WriteLine("Processing PPMs into images...");
-        FileInfo[] images = await PCDHelper.ProcessPPM(outputPath, parallelism, bmp, ppms);
+        ProgramLog.LogInfo("Processing PPMs into images...");
+        (FileInfo[] processedPPMs, FileInfo[] resultingImages) = await PCDHelper.ProcessPPM(outputPath, parallelism, bmp, resultingPPMs);
 
-        Console.WriteLine("Optimizing images...");
-        (FileInfo[] optimized, long totalSaved) = await OptimizationHelper.OptimizeImage(parallelism, images);
+        ProgramLog.LogInfo("Optimizing images...");
+        (FileInfo[] optimized, long totalSaved) = await OptimizationHelper.OptimizeImage(parallelism, resultingImages);
 
-        Parallel.ForEach(ppms, file =>
-        {
-            File.Delete(file.FullName);
-        });
-    }
-
-
-
-    /// <summary>
-    /// Processes a single PCD file into a PNG
-    /// </summary>
-    /// <param name="inputPath">The input file path</param>
-    /// <param name="outputPath">The output folder path</param>
-    /// <param name="bmp">Whether to save the output as bmp</param>
-    /// <param name="parallelism">When set higher than 0, specifies the number of cores to use for batch processing</param>
-    public static async Task ProcessPCDToPNG(string inputPath, string outputPath, bool bmp = false, int parallelism = 0)
-    {
-        Console.WriteLine("Processing PCDs into PPMs and storing them temporarily in the work directory...");
-        FileInfo[] ppms = await PCDHelper.ProcessPCDToPPM(parallelism, new FileInfo(inputPath));
-
-        Console.WriteLine("Processing PPMs into images...");
-        FileInfo[] images = await PCDHelper.ProcessPPM(outputPath, parallelism, bmp, ppms);
-
-        Console.WriteLine("Optimizing images...");
-        (FileInfo[] optimized, long totalSaved) = await OptimizationHelper.OptimizeImage(parallelism, images);
-
-        Console.WriteLine($"Total space saved: {OptimizationHelper.BytesToMegabytes(totalSaved)}");
-        Parallel.ForEach(ppms, file =>
+        Parallel.ForEach(resultingPPMs, file =>
         {
             File.Delete(file.FullName);
         });
@@ -237,27 +265,24 @@ public class Program
 
         while ((text = await reader.ReadLineAsync()) != null)
         {
-            Console.WriteLine(text);
+            ProgramLog.LogInfo(text);
         }
     }
 
-
-
     /// <summary>
-    /// Appends text to Missing.log
+    /// Consumes logs from a text reader
     /// </summary>
-    /// <param name="text">Text to append</param>
-    public static void AppendMissing(string text)
+    /// <param name="reader">Reader to consume from</param>
+    /// <returns>Task that can be awaited</returns>
+    public static async Task ConsumeError(TextReader reader)
     {
-        Console.WriteLine($"Writing {text} to Missing.log!");
-        
-        if (!File.Exists(MissingLogPath))
-            File.Create(MissingLogPath).Dispose();
-        
-        File.AppendAllText(MissingLogPath, text + '\n');
-    }
+        string? text;
 
-    
+        while ((text = await reader.ReadLineAsync()) != null)
+        {
+            ProgramLog.LogError(text);
+        }
+    }    
 }
 
 
